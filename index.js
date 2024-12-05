@@ -1,68 +1,79 @@
 class HotelReservationSystem {
-  constructor() {
-    this.rooms = [
-      { type: "Single", sleeps: 1, count: 2, price: 30 },
-      { type: "Double", sleeps: 2, count: 3, price: 50 },
-      { type: "Family", sleeps: 4, count: 1, price: 85 },
-    ];
+  constructor(roomTypes) {
+    this.rooms = roomTypes;
   }
 
   findReservation(guests) {
-    const validCombinations = this.findValidCombinations(guests);
+    const combinations = this.generateCombinations(guests);
 
-    if (validCombinations.length === 0) {
+    if (combinations.length === 0) {
       return "No option";
     }
 
-    const cheapestCombo = validCombinations.reduce((cheapest, current) =>
-      current.totalPrice < cheapest.totalPrice ? current : cheapest
-    );
+    const cheapestCombo = combinations.sort(
+      (a, b) => a.totalPrice - b.totalPrice
+    )[0];
 
-    return `${cheapestCombo.rooms.join(" ")} - $${cheapestCombo.totalPrice}`;
+    return `${cheapestCombo.roomTypes.join(" ")} - $${
+      cheapestCombo.totalPrice
+    }`;
   }
 
-  findValidCombinations(guests) {
+  generateCombinations(guests) {
     const validCombos = [];
+    const roomTypes = Object.keys(this.rooms);
 
-    for (let single = 0; single <= this.rooms[0].count; single++) {
-      for (let double = 0; double <= this.rooms[1].count; double++) {
-        for (let family = 0; family <= this.rooms[2].count; family++) {
-          const totalGuests =
-            single * this.rooms[0].sleeps +
-            double * this.rooms[1].sleeps +
-            family * this.rooms[2].sleeps;
+    const findCombinations = (currentCombo, currentGuests) => {
+      if (currentGuests === guests) {
+        const totalPrice = currentCombo.reduce(
+          (sum, room) => sum + this.rooms[room].price,
+          0
+        );
 
-          const totalPrice =
-            single * this.rooms[0].price +
-            double * this.rooms[1].price +
-            family * this.rooms[2].price;
+        const roomCounts = roomTypes.reduce(
+          (counts, type) => ({
+            ...counts,
+            [type]: currentCombo.filter((r) => r === type).length,
+          }),
+          {}
+        );
 
-          if (totalGuests === guests) {
-            const rooms = [];
-            if (single > 0) rooms.push(...Array(single).fill("Single"));
-            if (double > 0) rooms.push(...Array(double).fill("Double"));
-            if (family > 0) rooms.push(...Array(family).fill("Family"));
+        const isAvailable = roomTypes.every(
+          (type) => roomCounts[type] <= this.rooms[type].rooms
+        );
 
-            validCombos.push({
-              rooms: rooms,
-              totalPrice: totalPrice,
-            });
-          }
+        if (isAvailable) {
+          validCombos.push({
+            roomTypes: currentCombo,
+            totalPrice: totalPrice,
+          });
         }
+        return;
       }
-    }
 
+      if (currentGuests > guests) {
+        return;
+      }
+
+      for (let type of roomTypes) {
+        findCombinations(
+          [...currentCombo, type],
+          currentGuests + this.rooms[type].capacity
+        );
+      }
+    };
+
+    findCombinations([], 0);
     return validCombos;
   }
 }
 
-function testReservationSystem() {
-  const hotel = new HotelReservationSystem();
+const hotel = new HotelReservationSystem({
+  Single: { capacity: 1, rooms: 2, price: 30 },
+  Double: { capacity: 2, rooms: 3, price: 50 },
+  Family: { capacity: 4, rooms: 1, price: 85 },
+});
 
-  console.log("Test Case 1 (2 guests):", hotel.findReservation(2));
-  console.log("Test Case 2 (3 guests):", hotel.findReservation(3));
-  console.log("Test Case 3 (6 guests):", hotel.findReservation(6));
-  console.log("Test Case 4 (7 guests):", hotel.findReservation(7));
-}
-
-testReservationSystem();
+console.log(hotel.findReservation(2)); // Double - $50
+console.log(hotel.findReservation(3)); // Single Double - $80
+console.log(hotel.findReservation(4)); // Family - $85
